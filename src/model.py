@@ -53,12 +53,12 @@ class BNN():
 
 
 class SGHMC_OPT(torch.optim.Optimizer):
-    def __init__(self, parameters, lr=1e-3, C=0.05, alpha0=0.01, beta0=0):
+    def __init__(self, parameters, lr=1e-3, C=0.01, alpha0=0.01, beta_hat=0):
         super().__init__(parameters, dict())
         # Hyperparameters
         self.alpha0 = alpha0
-        self.beta0 = beta0
-        # SGHMC discretization step size
+        self.beta_hat = beta_hat    
+        self.a, self.b = 1, 1# SGHMC discretization step size
         self.lr = lr
         self.C = C
         # Each parameter group needs to have running dictionary to store momentum
@@ -71,10 +71,19 @@ class SGHMC_OPT(torch.optim.Optimizer):
                 if w not in self.state.keys():
                     # Sampling momentum from normal distribution
                     self.state[w]['r'] = torch.normal(mean=torch.zeros_like(w), std=torch.ones_like(w))
+                    self.state[w]['decay'] = np.random.gamma(shape=self.a, scale=1 / (self.b), size=None)
 
                 # Resample priors if needed
                 if resample_prior:
-                    pass # Note that this is NOT needed for reproducing SGHMC paper results
+                    # pass # Note that this may be NOT needed for reproducing SGHMC paper results
+                    # Gibbs sampling
+                    alpha = self.a + w.data.nelement() / 2
+                    beta = self.b + (w.data ** 2).sum().item() / 2
+                    self.state[w]['decay'] = np.random.gamma(shape=alpha, scale=1 / (beta), size=None)
+                
+                # Decay if needed
+                if self.state[w]['decay'] != 0:
+                    w.grad.data += w.data * self.state[w]['decay']
 
                 # Resample momentum if needed
                 if resample_r:
@@ -90,7 +99,7 @@ class SGHMC_OPT(torch.optim.Optimizer):
 
                 # Connect with SGD with momentum (section 3.3)
                 delta_w = r # We use identity matrix for the mass
-                noise = torch.normal(mean=torch.zeros_like(w), std=torch.ones_like(w) * (2 * self.lr * (self.alpha0 - self.beta0))**0.5)
+                noise = torch.normal(mean=torch.zeros_like(w), std=torch.ones_like(w) * (2 * self.lr * (self.alpha0 - self.beta_hat))**0.5)
                 delta_r = -self.lr * w.grad.data - self.alpha0 * r + noise
 
                 # Save updated parameters

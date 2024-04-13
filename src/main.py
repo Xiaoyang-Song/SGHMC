@@ -26,10 +26,11 @@ valldr = torch.utils.data.DataLoader(valset, batch_size=bsz_val, shuffle=False, 
 bnn = BNN()
 
 lr=0.2 * 1e-5
+# lr=1e-3
 n_epochs = 100
 burn_in = 50
 n_resample_r = 50
-n_resample_prior = 1e8 # basically we do not resample; prior is fixed according to the original paper
+n_resample_prior = 100 # basically we do not resample; prior is fixed according to the original paper
 
 optimizer = SGHMC_OPT(bnn.model.parameters(), lr=lr)
 
