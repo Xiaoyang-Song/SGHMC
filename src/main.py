@@ -25,7 +25,7 @@ valldr = torch.utils.data.DataLoader(valset, batch_size=bsz_val, shuffle=False, 
 
 bnn = BNN()
 
-lr=1e-3
+lr=0.2 * 1e-5
 n_epochs = 100
 burn_in = 50
 n_resample_r = 50
@@ -66,17 +66,18 @@ for i in tqdm(range(n_epochs)):
         model.save_weight_samples()
 
     # Test
-    n_samples = 0
-    for x, y in trildr:
-        x, y = x.to(DEVICE), y.to(DEVICE)
-        x = x.view(x.shape[0], -1)
-        loss, err, _ = bnn.predict(x, y)
+    with torch.no_grad():
+        n_samples = 0
+        for x, y in trildr:
+            x, y = x.to(DEVICE), y.to(DEVICE)
+            x = x.view(x.shape[0], -1)
+            loss, err, _ = bnn.predict(x, y)
 
-        val_l[i] += loss * len(x) # We compute the entire batch loss (not mean)
-        val_err[i] += err
-        n_samples += len(x)
+            val_l[i] += loss * len(x) # We compute the entire batch loss (not mean)
+            val_err[i] += err
+            n_samples += len(x)
 
-    val_l[i] /= n_samples
-    val_err[i] /= n_samples
-    print(f"Epoch {i}: {val_err[i]}")
+        val_l[i] /= n_samples
+        val_err[i] /= n_samples
+        print(f"Epoch {i}: {val_err[i]}")
 

@@ -15,8 +15,8 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class MLP(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(784, 1000)
-        self.fc2 = nn.Linear(1000, 10)
+        self.fc1 = nn.Linear(784, 100)
+        self.fc2 = nn.Linear(100, 10)
     
     def forward(self, x):
         out = self.fc1(x)
@@ -42,7 +42,7 @@ class BNN():
         self.model.eval()
         out = self.model(X)
         loss = F.cross_entropy(out, Y, reduction='sum')
-        probs = torch.softmax(out, dim=1).numpy().cpu()
+        probs = torch.softmax(out, dim=1).detach().numpy()
         preds = out.max(dim=1)[1]
         err = preds.ne(Y).sum()
 
@@ -82,11 +82,16 @@ class SGHMC_OPT(torch.optim.Optimizer):
 
                 # Start SGHMC update
                 r = self.state[w]['r']
-                B_hat = 0 # This is the simplest choice as mentioned in the SGHMC paper
+                # B_hat = 0 # This is the simplest choice as mentioned in the SGHMC paper
 
-                delta_w = self.lr * r # We use identity matrix for the mass
-                noise = torch.normal(mean=torch.zeros_like(w), std=torch.ones_like(w) * (2*self.lr * (self.C - B_hat))**0.5)
-                delta_r = -self.lr * w.grad.data - self.lr * self.C * r + noise
+                # delta_w = self.lr * r # We use identity matrix for the mass
+                # noise = torch.normal(mean=torch.zeros_like(w), std=torch.ones_like(w) * (2*self.lr * (self.C - B_hat))**0.5)
+                # delta_r = -self.lr * w.grad.data - self.lr * self.C * r + noise
+
+                # Connect with SGD with momentum (section 3.3)
+                delta_w = r # We use identity matrix for the mass
+                noise = torch.normal(mean=torch.zeros_like(w), std=torch.ones_like(w) * (2 * self.lr * (self.alpha0 - self.beta0))**0.5)
+                delta_r = -self.lr * w.grad.data - self.alpha0 * r + noise
 
                 # Save updated parameters
                 self.state[w]['r'] += delta_r
