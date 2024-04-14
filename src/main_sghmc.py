@@ -5,36 +5,43 @@ from torchvision import transforms, datasets
 import argparse
 import matplotlib
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--epochs', type=int, default=800)
+parser.add_argument('--dset', type=str, default='mnist')
+parser.add_argument('--lr', type=float, default=1e-4)
+parser.add_argument('--n_burnin', type=int, default=50)
+parser.add_argument('--n_resample_r', type=int, default=50)
+parser.add_argument('--n_resample_prior', type=int, default=100)
+args = parser.parse_args()
 
-# MNIST
-transform_train = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=(0.1307,), std=(0.3081,))])
-
-transform_test = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=(0.1307,), std=(0.3081,))])
-triset = datasets.MNIST(root='Data', train=True, download=True, transform=transform_train)
-valset = datasets.MNIST(root='Data', train=False, download=True, transform=transform_test)
-
-# FashionMNIST
-# triset = datasets.FashionMNIST("Data", download=True, train=True, transform=transforms.Compose([transforms.ToTensor()]))
-# valset = datasets.FashionMNIST("Data", download=True, train=False, transform=transforms.Compose([transforms.ToTensor()]))
+if args.dset == 'mnist':
+    # MNIST
+    transform_train = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=(0.1307,), std=(0.3081,))])
+    transform_test = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=(0.1307,), std=(0.3081,))])
+    triset = datasets.MNIST(root='Data', train=True, download=True, transform=transform_train)
+    valset = datasets.MNIST(root='Data', train=False, download=True, transform=transform_test)
+elif args.dset == 'fashion-mnist':
+    # FashionMNIST
+    triset = datasets.FashionMNIST("Data", download=True, train=True, transform=transforms.Compose([transforms.ToTensor()]))
+    valset = datasets.FashionMNIST("Data", download=True, train=False, transform=transforms.Compose([transforms.ToTensor()]))
+else:
+    assert False, 'Unrecognized argument dset'
 
 n_tri, n_val = len(triset), len(valset)
-print(n_tri, n_val)
-
-bsz_tri, bsz_val = 500, 500
+bsz_tri, bsz_val = 500, 500 # Fixed in SGHMC paper
 trildr = torch.utils.data.DataLoader(triset, batch_size=bsz_tri, shuffle=True, pin_memory=False)
 valldr = torch.utils.data.DataLoader(valset, batch_size=bsz_val, shuffle=False, pin_memory=False)
 
-bnn = BNN()
 
+bnn = BNN()
 # lr=0.2 * 1e-5
-lr=1e-4
-n_epochs = 800
-burn_in = 2
-n_resample_r = 50
-n_resample_prior = 100 # basically we do not resample; prior is fixed according to the original paper
+lr = args.lr
+n_epochs = args.epochs
+burn_in = args.n_burnin
+n_resample_r = args.n_resample_r
+n_resample_prior = args.n_resample_prior
 
 optimizer = SGHMC_OPT(bnn.model.parameters(), lr=lr)
-print(DEVICE)
 epoch, its = 0, 0
 tri_l, tri_err, val_l, val_err = np.zeros(n_epochs), np.zeros(n_epochs), np.zeros(n_epochs), np.zeros(n_epochs)
 for i in tqdm(range(n_epochs)):
@@ -81,11 +88,11 @@ for i in tqdm(range(n_epochs)):
 
             # Customized Fully-Bayesian approach after burn-in stage (can set m=1, 2, 5, 10 samples, will increase runtime)
             # Note that before burn-in, there should not be significant differences (SGHMC does not specify this)
-            m = 2
+            m = 5
             if i >= burn_in + m:
                 loss, err, losses, errs, _ = bnn.predict_multiple(x, y, m)
 
-            val_l[i] += loss * len(x) # We compute the entire batch loss (not mean)
+            val_l[i] += loss * len(x) # We compute the entire batch loss (not whole dataset)
             val_err[i] += err
             n_samples += len(x)
 
@@ -93,8 +100,8 @@ for i in tqdm(range(n_epochs)):
         val_err[i] /= n_samples
         print(f"Epoch {i}: {val_err[i]}")
 
-tag = 'fm'
-ckpt_dir = f'ckpt-{tag}'
+# Save models
+ckpt_dir = os.path.join('ckpt', args.dset, 'sghmc')
 os.makedirs(ckpt_dir, exist_ok=True)
 torch.save(tri_err, os.path.join(ckpt_dir, 'tri_err.pt'))
 torch.save(val_err, os.path.join(ckpt_dir, 'val_err.pt'))
