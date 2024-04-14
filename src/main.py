@@ -5,21 +5,17 @@ from torchvision import transforms, datasets
 import argparse
 import matplotlib
 
-# transform_train = transforms.Compose([
-#     transforms.ToTensor(),
-#     transforms.Normalize(mean=(0.1307,), std=(0.3081,))
-# ])
 
-# transform_test = transforms.Compose([
-#     transforms.ToTensor(),
-#     transforms.Normalize(mean=(0.1307,), std=(0.3081,))
-# ])
-# triset = datasets.MNIST(root='Data', train=True, download=True, transform=transform_train)
-# valset = datasets.MNIST(root='Data', train=False, download=True, transform=transform_test)
+# MNIST
+transform_train = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=(0.1307,), std=(0.3081,))])
+
+transform_test = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=(0.1307,), std=(0.3081,))])
+triset = datasets.MNIST(root='Data', train=True, download=True, transform=transform_train)
+valset = datasets.MNIST(root='Data', train=False, download=True, transform=transform_test)
 
 # FashionMNIST
-triset = datasets.FashionMNIST("Data", download=True, train=True, transform=transforms.Compose([transforms.ToTensor()]))
-valset = datasets.FashionMNIST("Data", download=True, train=False, transform=transforms.Compose([transforms.ToTensor()]))
+# triset = datasets.FashionMNIST("Data", download=True, train=True, transform=transforms.Compose([transforms.ToTensor()]))
+# valset = datasets.FashionMNIST("Data", download=True, train=False, transform=transforms.Compose([transforms.ToTensor()]))
 
 n_tri, n_val = len(triset), len(valset)
 print(n_tri, n_val)
@@ -33,7 +29,7 @@ bnn = BNN()
 # lr=0.2 * 1e-5
 lr=1e-4
 n_epochs = 800
-burn_in = 50
+burn_in = 2
 n_resample_r = 50
 n_resample_prior = 100 # basically we do not resample; prior is fixed according to the original paper
 
@@ -71,13 +67,23 @@ for i in tqdm(range(n_epochs)):
     if i >= burn_in:
         bnn.save_weight_samples()
 
-    # Test
+    # Evaluating on test set 
     with torch.no_grad():
         n_samples = 0
         for x, y in trildr:
             x, y = x.to(DEVICE), y.to(DEVICE)
             x = x.view(x.shape[0], -1)
+
+            # Classic prediction 
+            # Actually this is used in original paper when comparing results,
+            # Though the training follows bayesian route
             loss, err, _ = bnn.predict(x, y)
+
+            # Customized Fully-Bayesian approach after burn-in stage (can set m=1, 2, 5, 10 samples, will increase runtime)
+            # Note that before burn-in, there should not be significant differences (SGHMC does not specify this)
+            m = 2
+            if i >= burn_in + m:
+                loss, err, losses, errs, _ = bnn.predict_multiple(x, y, m)
 
             val_l[i] += loss * len(x) # We compute the entire batch loss (not mean)
             val_err[i] += err
