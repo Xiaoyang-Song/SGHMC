@@ -5,35 +5,40 @@ from torchvision import transforms, datasets
 import argparse
 import matplotlib
 
-transform_train = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize(mean=(0.1307,), std=(0.3081,))
-])
+# transform_train = transforms.Compose([
+#     transforms.ToTensor(),
+#     transforms.Normalize(mean=(0.1307,), std=(0.3081,))
+# ])
 
-transform_test = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize(mean=(0.1307,), std=(0.3081,))
-])
+# transform_test = transforms.Compose([
+#     transforms.ToTensor(),
+#     transforms.Normalize(mean=(0.1307,), std=(0.3081,))
+# ])
+# triset = datasets.MNIST(root='Data', train=True, download=True, transform=transform_train)
+# valset = datasets.MNIST(root='Data', train=False, download=True, transform=transform_test)
 
-bsz_tri, bsz_val = 500, 500
-triset = datasets.MNIST(root='Data', train=True, download=True, transform=transform_train)
-valset = datasets.MNIST(root='Data', train=False, download=True, transform=transform_test)
+# FashionMNIST
+triset = datasets.FashionMNIST("Data", download=True, train=True, transform=transforms.Compose([transforms.ToTensor()]))
+valset = datasets.FashionMNIST("Data", download=True, train=False, transform=transforms.Compose([transforms.ToTensor()]))
+
 n_tri, n_val = len(triset), len(valset)
 print(n_tri, n_val)
+
+bsz_tri, bsz_val = 500, 500
 trildr = torch.utils.data.DataLoader(triset, batch_size=bsz_tri, shuffle=True, pin_memory=False)
 valldr = torch.utils.data.DataLoader(valset, batch_size=bsz_val, shuffle=False, pin_memory=False)
 
 bnn = BNN()
 
-lr=0.2 * 1e-5
-# lr=1e-3
-n_epochs = 100
+# lr=0.2 * 1e-5
+lr=1e-4
+n_epochs = 800
 burn_in = 50
 n_resample_r = 50
 n_resample_prior = 100 # basically we do not resample; prior is fixed according to the original paper
 
 optimizer = SGHMC_OPT(bnn.model.parameters(), lr=lr)
-
+print(DEVICE)
 epoch, its = 0, 0
 tri_l, tri_err, val_l, val_err = np.zeros(n_epochs), np.zeros(n_epochs), np.zeros(n_epochs), np.zeros(n_epochs)
 for i in tqdm(range(n_epochs)):
@@ -64,7 +69,7 @@ for i in tqdm(range(n_epochs)):
     print(f"Epoch {i}: {tri_err[i]}")
     # Save BNN weights after burn-in stage
     if i >= burn_in:
-        model.save_weight_samples()
+        bnn.save_weight_samples()
 
     # Test
     with torch.no_grad():
@@ -81,4 +86,12 @@ for i in tqdm(range(n_epochs)):
         val_l[i] /= n_samples
         val_err[i] /= n_samples
         print(f"Epoch {i}: {val_err[i]}")
+
+tag = 'fm'
+ckpt_dir = f'ckpt-{tag}'
+os.makedirs(ckpt_dir, exist_ok=True)
+torch.save(tri_err, os.path.join(ckpt_dir, 'tri_err.pt'))
+torch.save(val_err, os.path.join(ckpt_dir, 'val_err.pt'))
+torch.save(bnn.weights, os.path.join(ckpt_dir, 'weights.pt'))
+torch.save(bnn, os.path.join(ckpt_dir, 'bnn.pt'))
 

@@ -42,7 +42,7 @@ class BNN():
         self.model.eval()
         out = self.model(X)
         loss = F.cross_entropy(out, Y, reduction='sum')
-        probs = torch.softmax(out, dim=1).detach().numpy()
+        probs = torch.softmax(out, dim=1).detach().cpu().numpy()
         preds = out.max(dim=1)[1]
         err = preds.ne(Y).sum()
 
@@ -58,7 +58,7 @@ class SGHMC_OPT(torch.optim.Optimizer):
         # Hyperparameters
         self.alpha0 = alpha0
         self.beta_hat = beta_hat    
-        self.a, self.b = 1, 1# SGHMC discretization step size
+        self.a, self.b = 1, 1 # SGHMC discretization step size
         self.lr = lr
         self.C = C
         # Each parameter group needs to have running dictionary to store momentum
@@ -91,16 +91,16 @@ class SGHMC_OPT(torch.optim.Optimizer):
 
                 # Start SGHMC update
                 r = self.state[w]['r']
-                # B_hat = 0 # This is the simplest choice as mentioned in the SGHMC paper
+                B_hat = 0 # This is the simplest choice as mentioned in the SGHMC paper
 
-                # delta_w = self.lr * r # We use identity matrix for the mass
-                # noise = torch.normal(mean=torch.zeros_like(w), std=torch.ones_like(w) * (2*self.lr * (self.C - B_hat))**0.5)
-                # delta_r = -self.lr * w.grad.data - self.lr * self.C * r + noise
+                delta_w = self.lr * r # We use identity matrix for the mass
+                noise = torch.normal(mean=torch.zeros_like(w), std=torch.ones_like(w) * (2*self.lr * (self.C - B_hat))**0.5)
+                delta_r = -self.lr * w.grad.data - self.lr * self.C * r + noise
 
                 # Connect with SGD with momentum (section 3.3)
-                delta_w = r # We use identity matrix for the mass
-                noise = torch.normal(mean=torch.zeros_like(w), std=torch.ones_like(w) * (2 * self.lr * (self.alpha0 - self.beta_hat))**0.5)
-                delta_r = -self.lr * w.grad.data - self.alpha0 * r + noise
+                # delta_w = r # We use identity matrix for the mass
+                # noise = torch.normal(mean=torch.zeros_like(w), std=torch.ones_like(w) * (2 * self.lr * (self.alpha0 - self.beta_hat))**0.5)
+                # delta_r = -self.lr * w.grad.data - self.alpha0 * r + noise
 
                 # Save updated parameters
                 self.state[w]['r'] += delta_r
