@@ -11,5 +11,5 @@
 #SBATCH --time=16:00:00
 #SBATCH --output=/scratch/sunwbgt_root/sunwbgt98/xysong/SGHMC/out/j-sgd.log
 
-python src/main_sgd.py --dset='mnist' --opt='sgd' --lr=1e-5 > /scratch/sunwbgt_root/sunwbgt98/xysong/SGHMC/out/sgd-m.log
-python src/main_sgd.py --dset='fashion-mnist' --opt='sgd' --lr=1e-3 > /scratch/sunwbgt_root/sunwbgt98/xysong/SGHMC/out/sgd-fm.log
+python src/main_sgd.py --dset='mnist' --opt='sgd' --lr=1e-4 > /scratch/sunwbgt_root/sunwbgt98/xysong/SGHMC/out/sgd-m.log
+python src/main_sgd.py --dset='fashion-mnist' --opt='sgd' --lr=1e-4 > /scratch/sunwbgt_root/sunwbgt98/xysong/SGHMC/out/sgd-fm.log
